@@ -1,1558 +1,401 @@
-
-from flask import Flask, render_template_string, jsonify
-from threading import Lock
-from datetime import datetime
+# =============================================================================
+# NHOM 8 - DO AN CLICKJACKING - VICTIM SERVER (ShopMart)
+# File: victim_server/app.py
+# Chay: python3 app.py  (mac dinh port 5000)
+# Yeu cau: pip3 install flask
+# =============================================================================
+from flask import Flask, request, jsonify, make_response
 
 app = Flask(__name__)
 
-# =====================================================
-# 1. DU LIEU MO PHONG
-# =====================================================
-
-MEMBERS = {
-    "huyen": {
-        "name": "Huyền",
-        "technique": "Classic Clickjacking",
-        "description": "Mô phỏng thao tác nhận và tặng xu",
-        "color": "orange"
-    },
-    "hang": {
-        "name": "Hằng",
-        "technique": "Multi-step Clickjacking",
-        "description": "Mô phỏng quy trình đăng nhập hai bước",
-        "color": "blue"
-    },
-    "tien": {
-        "name": "Tiên",
-        "technique": "Cursor-based Clickjacking",
-        "description": "Mô phỏng thao tác chia sẻ thông tin",
-        "color": "purple"
-    },
-    "hung": {
-        "name": "Hưng",
-        "technique": "Clickjacking Bypass Demo",
-        "description": "Mô phỏng yêu cầu thay đổi số điện thoại",
-        "color": "green"
-    }
+# -----------------------------------------------------------------------
+# TRANG THAI PHONG THU TOAN CUC (chi phuc vu DEMO, luu trong RAM server)
+# Key tuong ung voi tung thanh vien / tung ky thuat phong chong
+# -----------------------------------------------------------------------
+defense_state = {
+    "huyen": False,   # X-Frame-Options: DENY
+    "hang":  False,   # Content-Security-Policy: frame-ancestors 'none'
+    "tien":  False,   # Content-Security-Policy: frame-ancestors 'self'
+    "hung":  False,   # SameSite=Strict cho cookie phien + khoi phuc frame-busting JS
 }
 
-# Trạng thái bảo vệ dùng trong giao diện mô phỏng.
-PROTECTION = {
-    member: False for member in MEMBERS
+# -----------------------------------------------------------------------
+# TOA DO TUYET DOI (PIXEL) CUA 4 NUT MUC TIEU - PHAI KHOP VOI 4 FILE
+# TAN CONG BEN attacker_server/. KHONG DUOC SUA LE CAC SO NAY NEU KHONG
+# SUA DONG BO BEN KIA.
+# -----------------------------------------------------------------------
+COORDS = {
+    "huyen": {"top": 250, "left": 340, "w": 260, "h": 50},
+    "hang_step1": {"top": 250, "left": 660, "w": 260, "h": 50},
+    "hang_step2": {"top": 310, "left": 680, "w": 260, "h": 50},
+    "tien": {"top": 450, "left": 340, "w": 260, "h": 50},
+    "hung": {"top": 450, "left": 660, "w": 260, "h": 50},
 }
 
-EVENTS = [
-    {
-        "time": datetime.now().strftime("%H:%M:%S"),
-        "message": "Hệ thống ShopMart đã khởi động.",
-        "type": "system"
-    }
-]
-
-lock = Lock()
-
-
-# =====================================================
-# 2. GIAO DIEN SHOPMART
-# =====================================================
-
-
-PAGE = r"""
-<!DOCTYPE html>
+PAGE_TEMPLATE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ShopMart - Online Shopping</title>
-
+<title>ShopMart - Trung Tam Quan Ly Tai Khoan &amp; Vi Dien Tu</title>
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+  :root {{
+    --cam: #ff6a3d;
+    --do: #e8392b;
+    --xanh: #1fae5e;
+    --nen: #f4f6f9;
+    --vien: #e3e7ee;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }}
+  body {{ background: var(--nen); color: #222; }}
 
-:root {
-    --bg: #10131b;
-    --panel: #191e29;
-    --panel2: #202735;
-    --orange: #ff7139;
-    --text: #f5f5f6;
-    --muted: #929baa;
-    --border: rgba(255,255,255,0.08);
-}
-
-body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: Arial, Helvetica, sans-serif;
-}
-
-/* SIDEBAR */
-
-.sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 245px;
-    height: 100vh;
-    background: #171c27;
-    border-right: 1px solid var(--border);
-    padding: 28px 20px;
-    display: flex;
-    flex-direction: column;
-    z-index: 10;
-}
-
-.logo {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    padding: 0 8px;
-    margin-bottom: 42px;
-}
-
-.logo-symbol {
-    width: 39px;
-    height: 39px;
-    background: var(--orange);
+  /* ---------- HEADER ---------- */
+  header {{
+    height: 70px;
+    background: linear-gradient(90deg, var(--cam), var(--do));
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
     color: white;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    font-size: 23px;
-    font-weight: bold;
-}
+    box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    position: relative; z-index: 5;
+  }}
+  header .logo {{ font-size: 24px; font-weight: 800; letter-spacing: .5px; }}
+  header .logo span {{ font-weight: 400; opacity: .85; font-size: 14px; display:block; }}
+  header .user-pill {{
+    background: rgba(255,255,255,.18); padding: 8px 16px; border-radius: 30px;
+    font-size: 14px; font-weight: 600;
+  }}
 
-.logo-name {
-    font-size: 23px;
-    font-weight: 800;
-    letter-spacing: -1px;
-}
+  /* ---------- SIDEBAR ---------- */
+  .sidebar {{
+    position: absolute; top: 70px; left: 0; width: 260px; bottom: 0;
+    background: #1b2430; color: #cfd8e3; padding: 24px 18px;
+  }}
+  .sidebar .avatar {{
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--cam), var(--do));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800; color: white; margin: 0 auto 12px;
+  }}
+  .sidebar .name {{ text-align: center; font-weight: 700; font-size: 16px; color: #fff; }}
+  .sidebar .rank {{ text-align: center; font-size: 12px; color: #ffcf8f; margin-top: 2px; }}
+  .sidebar .wallet {{
+    margin-top: 22px; background: #263345; border-radius: 12px; padding: 14px; text-align: center;
+  }}
+  .sidebar .wallet .amount {{ font-size: 22px; font-weight: 800; color: #ffd166; }}
+  .sidebar .wallet .label {{ font-size: 12px; opacity: .75; margin-top: 2px; }}
+  .sidebar nav {{ margin-top: 26px; }}
+  .sidebar nav div {{
+    padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 6px; opacity: .8;
+  }}
+  .sidebar nav div.active {{ background: #30405a; opacity: 1; font-weight: 600; color: #fff; }}
 
-.logo-name span {
-    color: var(--orange);
-}
+  /* ---------- MAIN ---------- */
+  main {{
+    position: absolute; top: 70px; left: 260px; right: 0; bottom: 0;
+    padding: 30px 40px; overflow: auto;
+  }}
+  h1.page-title {{ font-size: 22px; margin-bottom: 4px; }}
+  p.sub {{ color: #777; font-size: 13px; margin-bottom: 20px; }}
 
-.menu-title {
-    color: #687386;
-    font-size: 10px;
-    font-weight: bold;
-    letter-spacing: 2px;
-    padding: 0 12px;
-    margin-bottom: 15px;
-}
+  /* ---------- CONTROL PANEL DEMO ---------- */
+  .demo-panel {{
+    background: #101826; border-radius: 14px; padding: 16px 20px; margin-bottom: 26px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  }}
+  .demo-panel .title {{ color: #9fd3ff; font-weight: 700; font-size: 13px; letter-spacing: .5px; }}
+  .toggle-item {{ display: flex; align-items: center; gap: 8px; }}
+  .toggle-item .nm {{ color: #e8edf5; font-size: 13px; font-weight: 600; }}
+  .toggle-btn {{
+    border: none; cursor: pointer; font-weight: 700; font-size: 12px;
+    padding: 7px 14px; border-radius: 20px; color: #fff; transition: .15s;
+  }}
+  .toggle-btn.off {{ background: var(--do); }}
+  .toggle-btn.on  {{ background: var(--xanh); }}
 
-.menu-item {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 13px;
-    margin-bottom: 6px;
-    border-radius: 9px;
-    color: #a7b0bf;
-    font-size: 13px;
-}
-
-.menu-item.active {
-    background: rgba(255,113,57,0.13);
-    color: #ff8759;
-}
-
-.menu-icon {
-    width: 20px;
-    text-align: center;
-    font-size: 17px;
-}
-
-.sidebar-bottom {
-    margin-top: auto;
-}
-
-.user-card {
-    background: #222a38;
-    padding: 15px;
-    border-radius: 12px;
-    margin-bottom: 12px;
-}
-
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #f2c39e;
-    color: #68432c;
-    display: grid;
-    place-items: center;
-    font-weight: bold;
-}
-
-.user-name {
-    font-size: 12px;
-    font-weight: bold;
-}
-
-.user-rank {
-    color: #f2bd62;
-    font-size: 10px;
-    margin-top: 5px;
-}
-
-.wallet-card {
-    padding: 16px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #f36b36, #f99a4e);
-}
-
-.wallet-label {
-    font-size: 10px;
-    color: rgba(255,255,255,.85);
-    letter-spacing: 1px;
-}
-
-.wallet-value {
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 8px;
-}
-
-/* MAIN */
-
-.main {
-    margin-left: 245px;
-    padding: 25px 35px 45px;
-    max-width: 1600px;
-}
-
-.navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 22px;
-    border-bottom: 1px solid var(--border);
-}
-
-.nav-links {
-    display: flex;
-    gap: 28px;
-    color: #aab3c1;
-    font-size: 12px;
-}
-
-.nav-links span:first-child {
-    color: white;
-}
-
-.nav-right {
-    display: flex;
-    align-items: center;
-    gap: 17px;
-    color: #b3bdca;
-    font-size: 12px;
-}
-
-.search-icon {
-    width: 35px;
-    height: 35px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-}
-
-/* HERO */
-
-.hero {
-    margin-top: 27px;
-    min-height: 245px;
-    border-radius: 17px;
-    padding: 38px 42px;
-    background:
-        radial-gradient(circle at 85% 25%, rgba(255,130,70,.25), transparent 30%),
-        linear-gradient(110deg, #292f3d, #202735 70%, #352a2a);
-    border: 1px solid rgba(255,255,255,.07);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    overflow: hidden;
-}
-
-.hero-content {
-    max-width: 530px;
-}
-
-.hero-tag {
-    color: #ff956b;
-    font-size: 10px;
-    font-weight: bold;
-    letter-spacing: 2px;
-    margin-bottom: 15px;
-}
-
-.hero h1 {
-    font-size: 31px;
-    line-height: 1.3;
-    margin-bottom: 12px;
-}
-
-.hero h1 span {
-    color: var(--orange);
-}
-
-.hero p {
-    color: #aeb7c5;
-    font-size: 12px;
-    line-height: 1.8;
-    max-width: 440px;
-}
-
-.hero-decoration {
-    width: 170px;
-    height: 170px;
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: 75px;
-    color: rgba(255,255,255,.8);
-    box-shadow: 0 0 0 20px rgba(255,255,255,.025),
-                0 0 0 42px rgba(255,255,255,.02);
-    margin-right: 40px;
-}
-
-/* GENERAL SECTION */
-
-.section {
-    margin-top: 34px;
-}
-
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    margin-bottom: 17px;
-}
-
-.section-header h2 {
-    font-size: 19px;
-    letter-spacing: -.3px;
-}
-
-.section-header p {
-    color: var(--muted);
-    font-size: 11px;
-    margin-top: 6px;
-}
-
-.view-label {
-    color: var(--orange);
-    font-size: 11px;
-}
-
-/* HIGHLIGHTS */
-
-.highlights {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-}
-
-.highlight {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 17px 19px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-.highlight-icon {
-    width: 43px;
-    height: 43px;
-    background: #292f3c;
-    border-radius: 11px;
-    display: grid;
-    place-items: center;
-    font-size: 20px;
-}
-
-.highlight-number {
-    font-size: 19px;
-    font-weight: bold;
-}
-
-.highlight-text {
-    color: var(--muted);
-    font-size: 10px;
-    margin-top: 5px;
-}
-
-/* PROTECTION SETTINGS */
-
-.protection-panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    padding: 20px;
-}
-
-.protection-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 17px;
-}
-
-.protection-top h3 {
-    font-size: 14px;
-}
-
-.demo-tag {
-    background: rgba(255,113,57,.13);
-    color: #ff946b;
-    padding: 6px 10px;
-    border-radius: 5px;
-    font-size: 9px;
-    font-weight: bold;
-}
-
-.protection-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 11px;
-}
-
-.protection-item {
-    background: #202735;
-    border: 1px solid var(--border);
-    padding: 13px;
-    border-radius: 9px;
-}
-
-.protection-name {
-    font-size: 12px;
-    font-weight: bold;
-}
-
-.protection-tech {
-    color: var(--muted);
-    font-size: 9px;
-    margin-top: 5px;
-    min-height: 22px;
-}
-
-.switch-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 11px;
-}
-
-.status-text {
-    font-size: 9px;
-    font-weight: bold;
-}
-
-.status-text.on {
-    color: #55d69b;
-}
-
-.status-text.off {
-    color: #f17a75;
-}
-
-.switch {
-    width: 36px;
-    height: 20px;
-    border: none;
-    border-radius: 20px;
-    background: #525d6d;
+  /* ---------- CARDS ---------- */
+  .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 30px; max-width: 980px; }}
+  .card {{
     position: relative;
-    cursor: pointer;
-}
+    background: #fff; border: 1px solid var(--vien); border-radius: 16px;
+    padding: 22px; box-shadow: 0 3px 14px rgba(0,0,0,.05);
+    height: 150px;
+  }}
+  .card .icon {{ font-size: 26px; }}
+  .card h3 {{ font-size: 16px; margin: 6px 0 4px; }}
+  .card p {{ font-size: 12.5px; color: #888; margin-bottom: 10px; }}
+  .badge {{
+    position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 20px;
+  }}
+  .badge.safe {{ background: #e3f8ec; color: var(--xanh); }}
+  .badge.danger {{ background: #ffeaea; color: var(--do); }}
 
-.switch::after {
-    content: "";
-    width: 14px;
-    height: 14px;
+  .action-btn {{
     position: absolute;
-    top: 3px;
-    left: 3px;
-    background: white;
-    border-radius: 50%;
-    transition: .2s;
-}
+    border: none; border-radius: 10px; font-weight: 700; font-size: 13.5px;
+    color: #fff; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.15);
+  }}
+  .btn-huyen {{ background: linear-gradient(90deg,#ff9a3d,#ff5c3d); }}
+  .btn-hang  {{ background: linear-gradient(90deg,#4f8cff,#2a5bd7); }}
+  .btn-tien  {{ background: linear-gradient(90deg,#9b5cff,#6a2bd7); }}
+  .btn-hung  {{ background: linear-gradient(90deg,#18c37e,#0e9c63); }}
+  .action-btn:disabled {{ background: #b9c2cf !important; cursor: not-allowed; }}
 
-.switch.on {
-    background: #27a975;
-}
+  #hangModal {{
+    display:none; position: fixed; top: 310px; left: 660px; width: 260px; height: 50px;
+    z-index: 50;
+  }}
 
-.switch.on::after {
-    left: 19px;
-}
-
-/* FUNCTION CARDS */
-
-.function-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-}
-
-.function-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    overflow: hidden;
-    transition: .2s;
-}
-
-.function-card:hover {
-    border-color: rgba(255,113,57,.45);
-    transform: translateY(-2px);
-}
-
-.function-cover {
-    height: 92px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 23px;
-}
-
-.cover-orange {
-    background: linear-gradient(110deg, #493126, #29232a);
-}
-
-.cover-blue {
-    background: linear-gradient(110deg, #253a55, #252b3c);
-}
-
-.cover-purple {
-    background: linear-gradient(110deg, #3b3052, #292638);
-}
-
-.cover-green {
-    background: linear-gradient(110deg, #24473e, #242e36);
-}
-
-.function-icon {
-    font-size: 31px;
-}
-
-.function-index {
-    color: rgba(255,255,255,.45);
-    font-size: 11px;
-    letter-spacing: 2px;
-}
-
-.function-body {
-    padding: 19px 21px 21px;
-}
-
-.function-title {
-    font-size: 15px;
-    font-weight: bold;
-}
-
-.function-tech {
-    font-size: 10px;
-    color: var(--orange);
-    margin-top: 6px;
-}
-
-.function-description {
-    font-size: 11px;
-    line-height: 1.7;
-    color: #a0aaba;
-    margin-top: 13px;
-    min-height: 37px;
-}
-
-.demo-info {
-    margin-top: 14px;
-    padding: 12px;
-    background: #202735;
-    border-radius: 8px;
-    color: #aeb8c6;
-    font-size: 10px;
-    line-height: 1.9;
-}
-
-.demo-info strong {
-    color: #f3f4f6;
-}
-
-.action-button {
-    margin-top: 14px;
-    width: 100%;
-    border: none;
-    padding: 12px;
-    border-radius: 7px;
-    color: white;
-    font-size: 10px;
-    font-weight: bold;
-    letter-spacing: .5px;
-    cursor: pointer;
-    transition: .2s;
-}
-
-.action-button:hover {
-    filter: brightness(1.12);
-}
-
-.action-orange { background: #e96e3b; }
-.action-blue { background: #477bc3; }
-.action-purple { background: #8060c3; }
-.action-green { background: #299b70; }
-
-.action-button:disabled {
-    background: #515c6b;
-    cursor: not-allowed;
-    filter: none;
-}
-
-.note {
-    color: #788597;
-    font-size: 9px;
-    text-align: center;
-    margin-top: 9px;
-}
-
-/* ACTIVITY */
-
-.activity-panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 17px 20px;
-}
-
-.activity-item {
-    display: flex;
-    gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-}
-
-.activity-item:last-child {
-    border-bottom: none;
-}
-
-.activity-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--orange);
-    margin-top: 5px;
-    flex-shrink: 0;
-}
-
-.activity-message {
-    color: #dce1e9;
-    font-size: 11px;
-    line-height: 1.6;
-}
-
-.activity-time {
-    color: #778397;
-    font-size: 9px;
-    margin-top: 4px;
-}
-
-.empty-message {
-    color: var(--muted);
-    font-size: 11px;
-}
-
-.footer {
-    text-align: center;
-    color: #657083;
-    font-size: 10px;
-    padding: 30px 0 5px;
-}
-
-/* RESPONSIVE */
-
-@media(max-width: 1050px) {
-    .protection-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .hero-decoration {
-        margin-right: 10px;
-    }
-}
-
-@media(max-width: 800px) {
-    .sidebar {
-        width: 70px;
-        padding: 20px 9px;
-    }
-
-    .logo {
-        justify-content: center;
-        padding: 0;
-        margin-bottom: 35px;
-    }
-
-    .logo-name,
-    .menu-title,
-    .menu-item span:not(.menu-icon),
-    .sidebar-bottom {
-        display: none;
-    }
-
-    .menu-item {
-        justify-content: center;
-        padding: 14px 5px;
-    }
-
-    .main {
-        margin-left: 70px;
-        padding: 20px;
-    }
-
-    .nav-links {
-        gap: 12px;
-    }
-}
-
-@media(max-width: 600px) {
-    .function-grid,
-    .highlights {
-        grid-template-columns: 1fr;
-    }
-
-    .hero {
-        padding: 25px;
-    }
-
-    .hero h1 {
-        font-size: 24px;
-    }
-
-    .hero-decoration {
-        display: none;
-    }
-
-    .protection-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .nav-links span:nth-child(n+3) {
-        display: none;
-    }
-}
+  .flash {{
+    position: fixed; bottom: 24px; right: 24px; background: #202a3a; color: #fff;
+    padding: 14px 20px; border-radius: 10px; font-size: 13px; display: none; z-index: 99;
+    box-shadow: 0 6px 20px rgba(0,0,0,.3);
+  }}
 </style>
 </head>
-
 <body>
 
-<!-- SIDEBAR -->
+<header>
+  <div class="logo">ShopMart <span>Trung tam quan ly tai khoan &amp; vi dien tu</span></div>
+  <div class="user-pill">👤 Nguyen Van A &nbsp;|&nbsp; Hang Kim Cuong</div>
+</header>
 
-<aside class="sidebar">
+<div class="sidebar">
+  <div class="avatar">A</div>
+  <div class="name">Nguyen Van A</div>
+  <div class="rank">💎 Hang Kim Cuong</div>
+  <div class="wallet">
+    <div class="amount">50.000</div>
+    <div class="label">Xu trong vi</div>
+  </div>
+  <nav>
+    <div class="active">🏠 Tong quan</div>
+    <div>💳 Vi dien tu</div>
+    <div>🔐 Bao mat</div>
+    <div>📦 Don hang</div>
+    <div>⚙️ Cai dat</div>
+  </nav>
+</div>
 
-    <div class="logo">
-        <div class="logo-symbol">S</div>
-        <div class="logo-name">Shop<span>Mart</span></div>
+<main>
+  <h1 class="page-title">Bang dieu khien tai khoan</h1>
+  <p class="sub">Day la mang luoi demo phuc vu do an "Clickjacking" - Nhom 8. Khong dung du lieu that.</p>
+
+  <div class="demo-panel">
+    <div class="title">🎛 CONTROL PANEL (CHI DANH CHO NGUOI THUYET TRINH)</div>
+    {toggles_html}
+  </div>
+
+  <div class="grid">
+
+    <!-- CARD 1 - HUYEN -->
+    <div class="card">
+      <span class="badge {huyen_badge_class}">{huyen_badge_text}</span>
+      <div class="icon">🪙</div>
+      <h3>Vi Diem Thuong ShopMart</h3>
+      <p>Tang toan bo so xu hien co trong vi cho mot tai khoan khac.</p>
+      <button id="btnHuyen" class="action-btn btn-huyen" {huyen_disabled}
+        style="top:{th}px; left:{tl}px; width:{tw}px; height:{thh}px;"
+        onclick="doAction('huyen')">Tang toan bo 50.000 Xu cho hacker_nhom8</button>
     </div>
 
-    <div class="menu-title">KHÁM PHÁ</div>
-
-    <div class="menu-item active">
-        <span class="menu-icon">⌂</span>
-        <span>Trang chủ</span>
+    <!-- CARD 2 - HANG (2 buoc) -->
+    <div class="card">
+      <span class="badge {hang_badge_class}">{hang_badge_text}</span>
+      <div class="icon">🔗</div>
+      <h3>Lien ket Dang nhap Nhanh (OAuth)</h3>
+      <p>Lien ket tai khoan Google de dang nhap nhanh lan sau.</p>
+      <button id="btnHangStep1" class="action-btn btn-hang" {hang_disabled}
+        style="top:{h1t}px; left:{h1l}px; width:{h1w}px; height:{h1h}px;"
+        onclick="hangStep1()">Lien ket voi Google (hacker@gmail.com)</button>
     </div>
 
-    <div class="menu-item">
-        <span class="menu-icon">▣</span>
-        <span>Ví của tôi</span>
+    <!-- CARD 3 - TIEN -->
+    <div class="card">
+      <span class="badge {tien_badge_class}">{tien_badge_text}</span>
+      <div class="icon">📍</div>
+      <h3>Quyen Rieng Tu &amp; Giao Hang</h3>
+      <p>Cho phep doi tac ben thu ba truy cap dia chi giao hang cua ban.</p>
+      <button id="btnTien" class="action-btn btn-tien" {tien_disabled}
+        style="top:{tt}px; left:{tl2}px; width:{tw2}px; height:{th2}px;"
+        onclick="doAction('tien')">Chia se Dia chi nha &amp; SDT voi doi tac</button>
     </div>
 
-    <div class="menu-item">
-        <span class="menu-icon">♙</span>
-        <span>Tài khoản</span>
+    <!-- CARD 4 - HUNG -->
+    <div class="card">
+      <span class="badge {hung_badge_class}">{hung_badge_text}</span>
+      <div class="icon">📱</div>
+      <h3>Bao Mat So Dien Thoai OTP</h3>
+      <p>Thay doi so dien thoai nhan ma OTP xac thuc giao dich.</p>
+      <button id="btnHung" class="action-btn btn-hung" {hung_disabled}
+        style="top:{ht}px; left:{hl}px; width:{hw}px; height:{hh}px;"
+        onclick="doAction('hung')">Doi SDT nhan OTP sang so cua Hacker</button>
     </div>
 
-    <div class="menu-item">
-        <span class="menu-icon">♡</span>
-        <span>Yêu thích</span>
-    </div>
-
-    <div class="menu-item">
-        <span class="menu-icon">◷</span>
-        <span>Lịch sử</span>
-    </div>
-
-    <div class="sidebar-bottom">
-
-        <div class="user-card">
-            <div class="user-info">
-                <div class="avatar">A</div>
-                <div>
-                    <div class="user-name">Nguyễn Văn A</div>
-                    <div class="user-rank">★ Hạng Kim Cương</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="wallet-card">
-            <div class="wallet-label">SHOPMART WALLET</div>
-            <div class="wallet-value">50.000 Xu</div>
-        </div>
-
-    </div>
-
-</aside>
-
-
-<!-- MAIN WEBSITE -->
-
-<main class="main">
-
-    <nav class="navbar">
-
-        <div class="nav-links">
-            <span>Trang chủ</span>
-            <span>Sản phẩm</span>
-            <span>Ưu đãi</span>
-            <span>Hỗ trợ</span>
-        </div>
-
-        <div class="nav-right">
-            <div class="search-icon">⌕</div>
-            <span>♙ Tài khoản của tôi</span>
-        </div>
-
-    </nav>
-
-
-    <!-- HERO -->
-
-    <section class="hero">
-
-        <div class="hero-content">
-
-            <div class="hero-tag">SHOPMART MEMBER EXCLUSIVE</div>
-
-            <h1>
-                Mua sắm thông minh.<br>
-                Tận hưởng <span>ưu đãi</span> mỗi ngày.
-            </h1>
-
-            <p>
-                Chào mừng bạn đến với ShopMart.
-                Quản lý tài khoản, ví điện tử và trải nghiệm
-                các tiện ích dành riêng cho thành viên.
-            </p>
-
-        </div>
-
-        <div class="hero-decoration">S</div>
-
-    </section>
-
-
-    <!-- HIGHLIGHTS -->
-
-    <section class="section">
-
-        <div class="highlights">
-
-            <div class="highlight">
-                <div class="highlight-icon">◈</div>
-                <div>
-                    <div class="highlight-number">50.000 Xu</div>
-                    <div class="highlight-text">Số dư ví hiện tại</div>
-                </div>
-            </div>
-
-            <div class="highlight">
-                <div class="highlight-icon">✦</div>
-                <div>
-                    <div class="highlight-number">Kim Cương</div>
-                    <div class="highlight-text">Hạng thành viên</div>
-                </div>
-            </div>
-
-            <div class="highlight">
-                <div class="highlight-icon">✓</div>
-                <div>
-                    <div class="highlight-number" id="protectedCount">0/4</div>
-                    <div class="highlight-text">Bảo vệ demo đang bật</div>
-                </div>
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- PROTECTION -->
-
-    <section class="section">
-
-        <div class="section-header">
-            <div>
-                <h2>Trung tâm bảo mật</h2>
-                <p>Quản lý trạng thái bảo vệ trong môi trường mô phỏng.</p>
-            </div>
-            <span class="view-label">SECURITY CENTER</span>
-        </div>
-
-        <div class="protection-panel">
-
-            <div class="protection-top">
-                <h3>Cài đặt bảo vệ</h3>
-                <span class="demo-tag">DEMO CONTROL</span>
-            </div>
-
-            <div class="protection-grid">
-
-                {% for member, info in members.items() %}
-
-                <div class="protection-item">
-
-                    <div class="protection-name">{{ info.name }}</div>
-
-                    <div class="protection-tech">
-                        {{ info.technique }}
-                    </div>
-
-                    <div class="switch-row">
-
-                        <span
-                            class="status-text {{ 'on' if protection[member] else 'off' }}"
-                            id="status-{{ member }}">
-                            {{ 'ĐANG BẬT' if protection[member] else 'ĐANG TẮT' }}
-                        </span>
-
-                        <button
-                            class="switch {{ 'on' if protection[member] else '' }}"
-                            id="switch-{{ member }}"
-                            onclick="toggleProtection('{{ member }}')">
-                        </button>
-
-                    </div>
-
-                </div>
-
-                {% endfor %}
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- FUNCTIONS -->
-
-    <section class="section">
-
-        <div class="section-header">
-            <div>
-                <h2>Tiện ích dành cho thành viên</h2>
-                <p>Khám phá các chức năng tài khoản trên ShopMart.</p>
-            </div>
-            <span class="view-label">EXPLORE FEATURES →</span>
-        </div>
-
-
-        <div class="function-grid">
-
-
-            <!-- HUYEN -->
-
-            <article class="function-card">
-
-                <div class="function-cover cover-orange">
-                    <div class="function-icon">◈</div>
-                    <div class="function-index">FEATURE 01</div>
-                </div>
-
-                <div class="function-body">
-
-                    <div class="function-title">Ví điện tử ShopMart</div>
-
-                    <div class="function-tech">
-                        Classic Clickjacking
-                    </div>
-
-                    <p class="function-description">
-                        Quản lý số dư ví và trải nghiệm tiện ích tặng xu
-                        dành cho các thành viên ShopMart.
-                    </p>
-
-                    <div class="demo-info">
-                        Số dư: <strong>50.000 Xu</strong><br>
-                        Tài khoản demo: <strong>hacker_nhom8</strong>
-                    </div>
-
-                    <button
-                        class="action-button action-orange"
-                        id="button-huyen"
-                        onclick="simulate('huyen')">
-                        MÔ PHỎNG TẶNG 50.000 XU
-                    </button>
-
-                    <div class="note">
-                        Thao tác chỉ được ghi nhận trong nhật ký demo
-                    </div>
-
-                </div>
-
-            </article>
-
-
-            <!-- HANG -->
-
-            <article class="function-card">
-
-                <div class="function-cover cover-blue">
-                    <div class="function-icon">◎</div>
-                    <div class="function-index">FEATURE 02</div>
-                </div>
-
-                <div class="function-body">
-
-                    <div class="function-title">Đăng nhập tài khoản</div>
-
-                    <div class="function-tech">
-                        Multi-step Clickjacking
-                    </div>
-
-                    <p class="function-description">
-                        Mô phỏng quy trình đăng nhập và xác nhận
-                        tài khoản qua hai bước.
-                    </p>
-
-                    <div class="demo-info">
-                        Dịch vụ: <strong>Google Login Demo</strong><br>
-                        Email demo: <strong>hacker@gmail.com</strong>
-                    </div>
-
-                    <button
-                        class="action-button action-blue"
-                        id="button-hang"
-                        onclick="simulate('hang')">
-                        MÔ PHỎNG XÁC NHẬN ĐĂNG NHẬP
-                    </button>
-
-                    <div class="note">
-                        Không kết nối Google OAuth thật
-                    </div>
-
-                </div>
-
-            </article>
-
-
-            <!-- TIEN -->
-
-            <article class="function-card">
-
-                <div class="function-cover cover-purple">
-                    <div class="function-icon">♧</div>
-                    <div class="function-index">FEATURE 03</div>
-                </div>
-
-                <div class="function-body">
-
-                    <div class="function-title">Thông tin cá nhân</div>
-
-                    <div class="function-tech">
-                        Cursor-based Clickjacking
-                    </div>
-
-                    <p class="function-description">
-                        Quản lý thông tin liên hệ và các thiết lập
-                        chia sẻ thông tin tài khoản.
-                    </p>
-
-                    <div class="demo-info">
-                        Địa chỉ: <strong>123 Đường ABC, Hà Nội</strong><br>
-                        Điện thoại: <strong>09xx xxx xxx</strong>
-                    </div>
-
-                    <button
-                        class="action-button action-purple"
-                        id="button-tien"
-                        onclick="simulate('tien')">
-                        MÔ PHỎNG CHIA SẺ THÔNG TIN
-                    </button>
-
-                    <div class="note">
-                        Dữ liệu giả lập, không gửi ra bên ngoài
-                    </div>
-
-                </div>
-
-            </article>
-
-
-            <!-- HUNG -->
-
-            <article class="function-card">
-
-                <div class="function-cover cover-green">
-                    <div class="function-icon">▣</div>
-                    <div class="function-index">FEATURE 04</div>
-                </div>
-
-                <div class="function-body">
-
-                    <div class="function-title">Bảo mật tài khoản</div>
-
-                    <div class="function-tech">
-                        Clickjacking Defense Demo
-                    </div>
-
-                    <p class="function-description">
-                        Quản lý thông tin xác minh và yêu cầu
-                        thay đổi số điện thoại liên kết.
-                    </p>
-
-                    <div class="demo-info">
-                        Số hiện tại: <strong>09xx xxx xxx</strong><br>
-                        Số mới: <strong>08xx xxx xxx</strong>
-                    </div>
-
-                    <button
-                        class="action-button action-green"
-                        id="button-hung"
-                        onclick="simulate('hung')">
-                        MÔ PHỎNG YÊU CẦU THAY ĐỔI
-                    </button>
-
-                    <div class="note">
-                        Không gửi hoặc xác thực OTP thật
-                    </div>
-
-                </div>
-
-            </article>
-
-        </div>
-
-    </section>
-
-
-    <!-- ACTIVITY -->
-
-    <section class="section">
-
-        <div class="section-header">
-            <div>
-                <h2>Lịch sử hoạt động</h2>
-                <p>Các hoạt động gần đây trong phiên mô phỏng.</p>
-            </div>
-        </div>
-
-        <div class="activity-panel" id="activityPanel">
-
-            {% for event in events %}
-
-            <div class="activity-item">
-                <div class="activity-dot"></div>
-
-                <div>
-                    <div class="activity-message">
-                        {{ event.message }}
-                    </div>
-
-                    <div class="activity-time">
-                        {{ event.time }}
-                    </div>
-                </div>
-            </div>
-
-            {% endfor %}
-
-        </div>
-
-    </section>
-
-
-    <footer class="footer">
-        © 2026 ShopMart. Educational Demonstration Website.
-    </footer>
-
+  </div>
 </main>
 
+<!-- Hop thoai buoc 2 cua Hang -->
+<button id="hangModal" class="action-btn btn-hang"
+  style="top:{h2t}px; left:{h2l}px; width:{h2w}px; height:{h2h}px;"
+  onclick="doAction('hang')">Xac nhan cap quyen dang nhap</button>
+
+<div class="flash" id="flash"></div>
 
 <script>
-
-// CAP NHAT GIAO DIEN BAO VE
-
-function updateProtectionUI(member, enabled) {
-
-    const switchButton =
-        document.getElementById("switch-" + member);
-
-    const statusText =
-        document.getElementById("status-" + member);
-
-    const actionButton =
-        document.getElementById("button-" + member);
-
-    switchButton.classList.toggle("on", enabled);
-
-    statusText.textContent =
-        enabled ? "ĐANG BẬT" : "ĐANG TẮT";
-
-    statusText.className =
-        enabled ? "status-text on" : "status-text off";
-
-    actionButton.disabled = enabled;
-
-    updateProtectedCount();
-}
-
-
-// BAT / TAT BAO VE
-
-async function toggleProtection(member) {
-
-    try {
-
-        const response = await fetch(
-            "/api/protection/" + member,
-            { method: "POST" }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert(data.message);
-            return;
-        }
-
-        updateProtectionUI(member, data.enabled);
-        loadEvents();
-
-    } catch (error) {
-
-        alert("Không thể kết nối đến ShopMart.");
-
-    }
-}
-
-
-// MO PHONG CHUC NANG
-
-async function simulate(member) {
-
-    const button =
-        document.getElementById("button-" + member);
-
-    button.disabled = true;
-
-    try {
-
-        const response = await fetch(
-            "/api/simulate/" + member,
-            { method: "POST" }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert(data.message);
-            return;
-        }
-
-        alert(data.message);
-        loadEvents();
-
-    } catch (error) {
-
-        alert("Không thể kết nối đến ShopMart.");
-
-    } finally {
-
-        const switchButton =
-            document.getElementById("switch-" + member);
-
-        if (!switchButton.classList.contains("on")) {
-            button.disabled = false;
-        }
-
-    }
-}
-
-
-// TAI NHAT KY
-
-async function loadEvents() {
-
-    try {
-
-        const response = await fetch("/api/events");
-        const data = await response.json();
-
-        const panel =
-            document.getElementById("activityPanel");
-
-        panel.innerHTML = "";
-
-        if (data.events.length === 0) {
-
-            panel.innerHTML =
-                '<div class="empty-message">Chưa có hoạt động nào.</div>';
-
-            return;
-        }
-
-        data.events.forEach(event => {
-
-            const item = document.createElement("div");
-            item.className = "activity-item";
-
-            const dot = document.createElement("div");
-            dot.className = "activity-dot";
-
-            const content = document.createElement("div");
-
-            const message = document.createElement("div");
-            message.className = "activity-message";
-            message.textContent = event.message;
-
-            const time = document.createElement("div");
-            time.className = "activity-time";
-            time.textContent = event.time;
-
-            content.appendChild(message);
-            content.appendChild(time);
-
-            item.appendChild(dot);
-            item.appendChild(content);
-
-            panel.appendChild(item);
-
-        });
-
-    } catch (error) {
-
-        console.log("Không thể tải nhật ký.");
-
-    }
-}
-
-
-// DEM SO KICH BAN DANG BAT
-
-async function updateProtectedCount() {
-
-    try {
-
-        const response = await fetch("/api/protection");
-        const data = await response.json();
-
-        const count = Object.values(data.protection)
-            .filter(value => value === true).length;
-
-        document.getElementById("protectedCount").textContent =
-            count + "/4";
-
-    } catch (error) {
-
-        console.log("Không thể cập nhật trạng thái.");
-
-    }
-}
-
-
-// KHOI TAO
-
-document.addEventListener("DOMContentLoaded", function() {
-
-    {% for member in members %}
-
-    updateProtectionUI(
-        "{{ member }}",
-        {{ 'true' if protection[member] else 'false' }}
-    );
-
-    {% endfor %}
-
-    updateProtectedCount();
-
-});
-
+function showFlash(msg) {{
+  var f = document.getElementById('flash');
+  f.innerText = msg;
+  f.style.display = 'block';
+  setTimeout(function() {{ f.style.display = 'none'; }}, 2600);
+}}
+
+function doAction(who) {{
+  var msgs = {{
+    huyen: '⚠️ [GIA LAP] Da tang 50.000 Xu cho hacker_nhom8 !',
+    tien: '⚠️ [GIA LAP] Da chia se dia chi nha & SDT cho ben thu 3 !',
+    hung: '⚠️ [GIA LAP] Da doi so nhan OTP sang so cua Hacker !',
+    hang: '⚠️ [GIA LAP] Da cap quyen dang nhap OAuth cho hacker@gmail.com !'
+  }};
+  showFlash(msgs[who] || 'Da thuc hien hanh dong');
+  fetch('/log_action', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{action: who}})}});
+}}
+
+function hangStep1() {{
+  document.getElementById('hangModal').style.display = 'block';
+  showFlash('Buoc 1: Da chon lien ket Google. Dang cho xac nhan Buoc 2...');
+}}
+
+/* ----- FRAME-BUSTING JS (muc tieu cua Hung) -----
+   Doan nay chi hoat dong khi trinh duyet THUC THI JavaScript trong iframe.
+   Neu attacker dung <iframe sandbox="allow-forms" ...> (KHONG co allow-scripts)
+   thi script nay se KHONG BAO GIO chay => ky thuat bypass frame-busting thanh cong. */
+if ({hung_bust_active} && top !== self) {{
+  try {{ top.location = self.location; }} catch (e) {{
+    document.body.innerHTML =
+      '<div style="padding:60px;text-align:center;font-size:20px;color:#e8392b;font-weight:700;">'
+      + '🛡️ ShopMart phat hien trang dang bi nhung (iframe) va da chan truy cap!</div>';
+  }}
+}}
 </script>
-
 </body>
 </html>
 """
 
+TOGGLE_LABEL = {
+    "huyen": "Huyen · X-Frame-Options",
+    "hang":  "Hang · CSP frame-ancestors 'none'",
+    "tien":  "Tien · CSP frame-ancestors 'self'",
+    "hung":  "Hung · CSP + SameSite=Strict",
+}
 
 
-# =====================================================
-# 8. CAC ROUTE CUA FLASK
-# =====================================================
+def render_toggles():
+    html = ""
+    for key, label in TOGGLE_LABEL.items():
+        state = defense_state[key]
+        cls = "on" if state else "off"
+        text = "BAT" if state else "TAT"
+        html += (
+            '<div class="toggle-item"><span class="nm">{label}</span>'
+            '<button class="toggle-btn {cls}" onclick="toggleDefense(\'{key}\')">{text}</button></div>'
+        ).format(label=label, cls=cls, text=text, key=key)
+    html += """
+    <script>
+    function toggleDefense(key){
+      fetch('/toggle/' + key, {method:'POST'}).then(function(){ location.reload(); });
+    }
+    </script>
+    """
+    return html
+
 
 @app.route("/")
-def home():
+def index():
+    c = COORDS
+    hb = defense_state["huyen"]
+    hg = defense_state["hang"]
+    ti = defense_state["tien"]
+    hu = defense_state["hung"]
 
-    return render_template_string(
-        PAGE,
-        members=MEMBERS,
-        protection=PROTECTION,
-        events=EVENTS
+    html = PAGE_TEMPLATE.format(
+        toggles_html=render_toggles(),
+        huyen_badge_class="safe" if hb else "danger",
+        huyen_badge_text="🛡 Da bao ve" if hb else "⚠ Chua bao ve",
+        huyen_disabled="disabled" if hb else "",
+        th=c["huyen"]["top"], tl=c["huyen"]["left"], tw=c["huyen"]["w"], thh=c["huyen"]["h"],
+
+        hang_badge_class="safe" if hg else "danger",
+        hang_badge_text="🛡 Da bao ve" if hg else "⚠ Chua bao ve",
+        hang_disabled="disabled" if hg else "",
+        h1t=c["hang_step1"]["top"], h1l=c["hang_step1"]["left"],
+        h1w=c["hang_step1"]["w"], h1h=c["hang_step1"]["h"],
+        h2t=c["hang_step2"]["top"], h2l=c["hang_step2"]["left"],
+        h2w=c["hang_step2"]["w"], h2h=c["hang_step2"]["h"],
+
+        tien_badge_class="safe" if ti else "danger",
+        tien_badge_text="🛡 Da bao ve" if ti else "⚠ Chua bao ve",
+        tien_disabled="disabled" if ti else "",
+        tt=c["tien"]["top"], tl2=c["tien"]["left"], tw2=c["tien"]["w"], th2=c["tien"]["h"],
+
+        hung_badge_class="safe" if hu else "danger",
+        hung_badge_text="🛡 Da bao ve" if hu else "⚠ Chua bao ve",
+        hung_disabled="disabled" if hu else "",
+        ht=c["hung"]["top"], hl=c["hung"]["left"], hw=c["hung"]["w"], hh=c["hung"]["h"],
+        hung_bust_active="true" if not hu else "false",
     )
 
+    resp = make_response(html)
 
-# -----------------------------------------------------
-# Lay trang thai bao ve
-# -----------------------------------------------------
+    # ---------------- HEADER PHONG THU (dong theo trang thai toggle) ----------------
+    # 1) Huyen - X-Frame-Options
+    if hb:
+        resp.headers["X-Frame-Options"] = "DENY"
 
-@app.route("/api/protection", methods=["GET"])
-def get_all_protection():
+    # 2) Hang & Tien - CSP frame-ancestors (gop logic, uu tien 'none' vi chat hon)
+    frame_ancestors = None
+    if hg:
+        frame_ancestors = "'none'"
+    elif ti:
+        frame_ancestors = "'self'"
+    if frame_ancestors:
+        resp.headers["Content-Security-Policy"] = "frame-ancestors {};".format(frame_ancestors)
 
-    with lock:
-        return jsonify({
-            "protection": PROTECTION
-        })
+    # 3) Hung - cookie phien SameSite=Strict (ngan trinh duyet gui cookie khi
+    #    request den tu context cua trang khac / bi nhung trong iframe xuyen goc)
+    samesite = "Strict" if hu else "Lax"
+    resp.set_cookie("shopmart_session", "demo-session-token", samesite=samesite, httponly=True)
 
-
-# -----------------------------------------------------
-# Bat / tat trang thai bao ve
-# -----------------------------------------------------
-
-@app.route("/api/protection/<member>", methods=["POST"])
-def toggle_protection(member):
-
-    if member not in MEMBERS:
-        return jsonify({
-            "message": "Không tìm thấy kịch bản."
-        }), 404
-
-    with lock:
-
-        PROTECTION[member] = not PROTECTION[member]
-
-        enabled = PROTECTION[member]
-
-        status = "bật" if enabled else "tắt"
-
-        EVENTS.insert(0, {
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "message": (
-                f"Đã {status} trạng thái bảo vệ mô phỏng "
-                f"cho thành viên {MEMBERS[member]['name']}."
-            ),
-            "type": "protection"
-        })
-
-        del EVENTS[12:]
-
-    return jsonify({
-        "success": True,
-        "member": member,
-        "enabled": enabled
-    })
+    return resp
 
 
-# -----------------------------------------------------
-# Mo phong thao tac cua tung kich ban
-# -----------------------------------------------------
-
-@app.route("/api/simulate/<member>", methods=["POST"])
-def simulate(member):
-
-    if member not in MEMBERS:
-        return jsonify({
-            "message": "Không tìm thấy kịch bản."
-        }), 404
-
-    with lock:
-
-        if PROTECTION[member]:
-
-            return jsonify({
-                "success": False,
-                "message": (
-                    "Trạng thái bảo vệ mô phỏng đang được bật. "
-                    "Thao tác demo đã bị chặn."
-                )
-            }), 403
-
-        name = MEMBERS[member]["name"]
-
-        messages = {
-            "huyen": (
-                "Đã ghi nhận thao tác mô phỏng tặng 50.000 Xu "
-                "cho tài khoản hacker_nhom8. "
-                "Số dư thật không bị thay đổi."
-            ),
-
-            "hang": (
-                "Đã ghi nhận thao tác mô phỏng xác nhận "
-                "đăng nhập Google hai bước. "
-                "Không có tài khoản Google nào được kết nối."
-            ),
-
-            "tien": (
-                "Đã ghi nhận thao tác mô phỏng chia sẻ "
-                "thông tin liên hệ. "
-                "Không có dữ liệu nào được gửi ra ngoài."
-            ),
-
-            "hung": (
-                "Đã ghi nhận thao tác mô phỏng yêu cầu "
-                "thay đổi số điện thoại. "
-                "Không có số điện thoại hoặc OTP thật nào được xử lý."
-            )
-        }
-
-        message = messages[member]
-
-        EVENTS.insert(0, {
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "message": f"{name}: {message}",
-            "type": "simulation"
-        })
-
-        del EVENTS[12:]
-
-    return jsonify({
-        "success": True,
-        "message": message
-    })
+@app.route("/toggle/<member>", methods=["POST"])
+def toggle(member):
+    if member in defense_state:
+        defense_state[member] = not defense_state[member]
+        return jsonify({"ok": True, "state": defense_state[member]})
+    return jsonify({"ok": False}), 404
 
 
-# -----------------------------------------------------
-# Lay nhat ky hoat dong
-# -----------------------------------------------------
-
-@app.route("/api/events", methods=["GET"])
-def get_events():
-
-    with lock:
-
-        return jsonify({
-            "events": EVENTS
-        })
+@app.route("/log_action", methods=["POST"])
+def log_action():
+    data = request.get_json(silent=True) or {}
+    print("[VICTIM LOG] Hanh dong duoc kich hoat tu client:", data.get("action"))
+    return jsonify({"ok": True})
 
 
-# =====================================================
-# 9. CHAY UNG DUNG
-# =====================================================
+@app.route("/reset", methods=["POST"])
+def reset():
+    for k in defense_state:
+        defense_state[k] = False
+    return jsonify({"ok": True})
+
 
 if __name__ == "__main__":
-
-    app.run(
-        host="127.0.0.1",
-        port=5000,
-        debug=True
-    )
+    print("=" * 70)
+    print(" SHOPMART VICTIM SERVER - NHOM 8 - DANG CHAY TAI http://0.0.0.0:5000")
+    print(" Dung Ctrl+C de dung server.")
+    print("=" * 70)
+    app.run(host="0.0.0.0", port=5000, debug=True)
