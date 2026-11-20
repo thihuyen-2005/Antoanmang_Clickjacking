@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TechZone News - Tin Cong Nghe Moi Nhat</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,Arial,sans-serif; }
+  body { background:#0e1420; color:#e8edf5; }
+
+  /* ----- TRANG BAO DIEN TU GIA (moi nhu) ----- */
+  header.site {
+    height:70px; background:#121a28; display:flex; align-items:center;
+    justify-content:space-between; padding:0 30px; border-bottom:3px solid #2b6fff;
+  }
+  header.site .logo { font-size:22px; font-weight:800; color:#2b6fff; }
+  header.site nav a { color:#cfd8e3; margin-left:22px; text-decoration:none; font-size:14px; }
+
+  .hero {
+    height: 320px; background: linear-gradient(120deg,#1a2436,#0e1420);
+    display:flex; align-items:center; padding:0 60px; gap:40px;
+  }
+  .hero .txt h1 { font-size:34px; max-width:560px; line-height:1.3; }
+  .hero .txt p { color:#9aa7bb; margin-top:14px; max-width:520px; font-size:14.5px; }
+  .hero .badge { background:#2b6fff; color:#fff; font-size:12px; font-weight:700; padding:5px 12px; border-radius:20px; margin-bottom:14px; display:inline-block; }
+
+  .articles { max-width:1100px; margin:40px auto; display:grid; grid-template-columns:repeat(3,1fr); gap:24px; padding: 0 30px 80px; }
+  .article-card { background:#121a28; border-radius:14px; padding:18px; border:1px solid #1e2a3d; }
+  .article-card .tag { color:#2b6fff; font-size:11px; font-weight:700; }
+  .article-card h3 { font-size:15px; margin:8px 0; }
+  .article-card p { font-size:12.5px; color:#8c97ab; }
+
+  /* ----- OVERLAY COOKIE CONSENT (MOI NHU) -----
+     Day la lop PHU HOA MY, ben duoi la IFRAME trong suot cua ShopMart.
+     Nut "Chap nhan tat ca Cookie" duoc dat TRUNG KHIT toa do nut
+     "Tang 50.000 Xu" cua ShopMart (top:250 left:340 w:260 h:50). */
+  .cookie-overlay {
+    position: fixed; left:0; right:0; bottom:0; background:#161f2e;
+    border-top:1px solid #2a3850; padding: 22px 60px; z-index: 40;
+    box-shadow: 0 -8px 30px rgba(0,0,0,.4);
+    display:flex; align-items:center; justify-content:space-between; gap:30px;
+  }
+  .cookie-overlay p { font-size:13px; color:#b7c1d1; max-width:640px; line-height:1.5; }
+  .cookie-overlay .cookie-icon { font-size:26px; margin-right:10px; }
+
+  /* Nut gia duoc dat o toa do TUYET DOI, khop voi ShopMart */
+  #decoyBtn {
+    position: fixed; top:250px; left:340px; width:260px; height:50px;
+    background: linear-gradient(90deg,#2b6fff,#1746b3); color:#fff; border:none;
+    border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer;
+    box-shadow:0 6px 18px rgba(43,111,255,.4); z-index: 41;
+  }
+  #decoyReject {
+    position: fixed; top:250px; left: 620px; width: 160px; height:50px;
+    background:#2a3850; color:#cfd8e3; border:none; border-radius:10px;
+    font-weight:600; font-size:13px; cursor:pointer; z-index: 41;
+  }
+
+  /* IFRAME nan nhan - mac dinh opacity 0 (tan cong that), bam nut goc de xem opacity 0.35 */
+  #victimFrame {
+    position: fixed; top:0; left:0; width:100vw; height:100vh; border:none;
+    z-index: 30; opacity: 0; pointer-events: none; /* khong cho click truc tiep vao iframe, click se "roi" qua lop tren */
+  }
+
+  /* NUT GAT DEMO O GOC MAN HINH */
+  #demoToggle {
+    position: fixed; bottom: 16px; left: 16px; z-index: 99;
+    background:#1b2430; color:#fff; border:1px solid #39495f; border-radius: 10px;
+    padding: 10px 14px; font-size: 12px; cursor:pointer; font-weight:700;
+  }
+  #demoLabel { position: fixed; bottom: 54px; left:16px; z-index:99; background:#000a; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="logo">⚡ TechZone <span style="color:#fff;font-weight:400;">News</span></div>
+  <nav>
+    <a href="#">Trang chu</a><a href="#">AI</a><a href="#">Phan cung</a><a href="#">Bao mat</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="txt">
+    <span class="badge">NOI BAT</span>
+    <h1>Cong nghe AI tao sinh dang thay doi nganh phat trien phan mem nhu the nao?</h1>
+    <p>Cac cong cu lap trinh dua tren AI dang giup lap trinh vien tiet kiem hang chuc gio moi tuan. Cung TechZone tim hieu xu huong nam nay...</p>
+  </div>
+</section>
+
+<section class="articles">
+  <div class="article-card"><div class="tag">BAO MAT</div><h3>5 loai tan cong web pho bien nam 2026</h3><p>Tong hop cac ky thuat tan cong va cach phong chong danh cho nguoi moi.</p></div>
+  <div class="article-card"><div class="tag">PHAN CUNG</div><h3>Danh gia chip the he moi: hieu nang vuot troi</h3><p>Buoc nhay vot ve hieu nang tren dong chip moi nhat vua duoc cong bo.</p></div>
+  <div class="article-card"><div class="tag">AI</div><h3>Cac mo hinh ngon ngu lon dang duoc ung dung ra sao?</h3><p>Nhung ung dung thuc te cua LLM trong doanh nghiep hien nay.</p></div>
+</section>
+
+<!-- IFRAME NAN NHAN (ShopMart) -->
+<iframe id="victimFrame" src="http://localhost:5000"></iframe>
+
+<!-- LOP PHU - HOP THOAI COOKIE GIA -->
+<div class="cookie-overlay">
+  <p><span class="cookie-icon">🍪</span>TechZone su dung cookie de ca nhan hoa trai nghiem doc bao va quang cao phu hop voi ban. Nhan "Chap nhan tat ca Cookie" de tiep tuc su dung website voi trai nghiem tot nhat.</p>
+</div>
+<button id="decoyBtn">✅ Chap nhan tat ca Cookie</button>
+<button id="decoyReject">Tu choi</button>
+
+<div id="demoLabel">Opacity iframe: <span id="opVal">0</span></div>
+<button id="demoToggle" onclick="toggleOpacity()">🎚 Chuyen do mo (Giang vien / Tan cong that)</button>
+
+<script>
+  var frame = document.getElementById('victimFrame');
+  var decoy = document.getElementById('decoyBtn');
+  var opVal = document.getElementById('opVal');
+  var state = 0; // 0 = tan cong that (opacity 0), 1 = giai thich (opacity 0.35)
+
+  function toggleOpacity() {
+    state = state === 0 ? 1 : 0;
+    if (state === 1) {
+      frame.style.opacity = '0.35';
+      frame.style.pointerEvents = 'none';
+      decoy.style.opacity = '0.55';
+      opVal.innerText = '0.35 (che do giai thich)';
+    } else {
+      frame.style.opacity = '0';
+      decoy.style.opacity = '1';
+      opVal.innerText = '0 (tan cong that - vo hinh)';
+    }
+  }
+
+  decoy.addEventListener('click', function(){
+    alert('🎯 [DEMO] Click cua ban vua "roi xuyen qua" lop giao dien nay va thuc su rơi trung vao nut "Tang 50.000 Xu" vo hinh cua ShopMart ben duoi!');
+  });
+</script>
+</body>
+</html>

