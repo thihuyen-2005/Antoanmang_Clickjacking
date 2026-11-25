@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nhom 8 - Pentest Control Center - Clickjacking</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,Arial,sans-serif; }
+  body { background: #0b0f17; color:#dbe3f0; min-height:100vh; }
+
+  header {
+    padding: 34px 50px 20px; border-bottom:1px solid #1c2534;
+  }
+  header .tag { color:#38e07a; font-size:12px; font-weight:800; letter-spacing:2px; }
+  header h1 { font-size:28px; margin: 8px 0 6px; }
+  header p { color:#7e8aa0; font-size:13.5px; max-width:720px; }
+
+  .grid {
+    max-width: 1180px; margin: 36px auto; padding: 0 50px 60px;
+    display:grid; grid-template-columns: repeat(2, 1fr); gap: 26px;
+  }
+  .card {
+    background: linear-gradient(160deg,#121a28,#0e141f); border:1px solid #1e2a3d;
+    border-radius:18px; padding: 26px 28px; position:relative; overflow:hidden;
+  }
+  .card::before {
+    content:""; position:absolute; top:-40px; right:-40px; width:140px; height:140px;
+    border-radius:50%; opacity:.12; background: var(--c);
+  }
+  .card .member { font-size:12px; font-weight:800; letter-spacing:1px; color: var(--c); }
+  .card h2 { font-size:19px; margin: 8px 0 10px; }
+  .card p.desc { color:#9aa7bb; font-size:13px; line-height:1.55; margin-bottom: 16px; }
+  .tech-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom: 18px; }
+  .tech-pill {
+    background:#1b2536; border:1px solid #28354a; color:#9fd3ff; font-size:11px;
+    padding: 5px 10px; border-radius: 20px;
+  }
+  .defense-pill {
+    background:#102a1c; border:1px solid #1f5c3a; color:#4ddc8e; font-size:11px;
+    padding: 5px 10px; border-radius: 20px;
+  }
+  .open-btn {
+    display:inline-block; text-decoration:none; color:#0b0f17; font-weight:800; font-size:13px;
+    padding: 10px 18px; border-radius: 10px; background: var(--c);
+  }
+
+  .card1 { --c:#ff6a3d; } .card2 { --c:#4f8cff; } .card3 { --c:#9b5cff; } .card4 { --c:#18c37e; }
+
+  footer { text-align:center; color:#58637a; font-size:12px; padding: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="tag">🎯 NHOM 8 — PENTEST CONTROL CENTER</div>
+  <h1>Clickjacking Attack Lab</h1>
+  <p>Trung tam dieu khien demo 4 ky thuat Clickjacking tren website ShopMart (nan nhan dung chung). Yeu cau ShopMart dang chay tai <b>http://127.0.0.1:5000</b> va mo tung the bai ben duoi tren tab moi.</p>
+</header>
+
+<div class="grid">
+
+  <div class="card card1">
+    <div class="member">THANH VIEN 1 · HUYEN</div>
+    <h2>Classic Clickjacking</h2>
+    <p class="desc">Nhung ShopMart vao iframe trong suot, dat nut moi "Chap nhan Cookie" tren nen bao dien tu gia, trung khit nut "Tang 50.000 Xu".</p>
+    <div class="tech-row"><span class="tech-pill">iframe opacity:0</span><span class="tech-pill">Hop thoai Cookie gia</span></div>
+    <div class="tech-row"><span class="defense-pill">🛡 Phong thu: X-Frame-Options: DENY</span></div>
+    <a class="open-btn" href="huyen_classic.html" target="_blank">Mo kich ban ➜</a>
+  </div>
+
+  <div class="card card2">
+    <div class="member">THANH VIEN 2 · HANG</div>
+    <h2>Multistep Clickjacking</h2>
+    <p class="desc">Mo phong OAuth hai buoc de minh hoa cach mot giao dien co the dan nguoi dung nhan lien tiep hai nut.</p>
+    <div class="tech-row"><span class="tech-pill">OAuth 2 buoc</span><span class="tech-pill">2-step overlay</span></div>
+    <div class="tech-row"><span class="defense-pill">🛡 Phong thu: CSP frame-ancestors 'none'</span></div>
+    <a class="open-btn" href="hang_multistep.html" target="_blank">Mo kich ban ➜</a>
+  </div>
+
+  <div class="card card3">
+    <div class="member">THANH VIEN 3 · TIEN</div>
+    <h2>Cursorjacking</h2>
+    <p class="desc">An con tro that, hien thi con tro gia lech 320px tren web doc truyen tranh, danh lua nguoi dung click nham vao vung chia se dia chi.</p>
+    <div class="tech-row"><span class="tech-pill">cursor:none</span><span class="tech-pill">SVG fake cursor</span></div>
+    <div class="tech-row"><span class="defense-pill">🛡 Phong thu: CSP frame-ancestors 'self'</span></div>
+    <a class="open-btn" href="tien_cursor.html" target="_blank">Mo kich ban ➜</a>
+  </div>
+
+  <div class="card card4">
+    <div class="member">THANH VIEN 4 · HUNG</div>
+    <h2>Bypass Frame-Busting JS</h2>
+    <p class="desc">Dung iframe sandbox="allow-forms" de vo hieu hoa hoan toan doan JS chong nhung cua ShopMart, chiem quyen doi SDT nhan OTP.</p>
+    <div class="tech-row"><span class="tech-pill">sandbox=allow-forms</span><span class="tech-pill">Vo hieu hoa JS</span></div>
+    <div class="tech-row"><span class="defense-pill">🛡 Phong thu: CSP + SameSite=Strict</span></div>
+    <a class="open-btn" href="hung_bypass.html" target="_blank">Mo kich ban ➜</a>
+  </div>
+
+</div>
+
+<footer>Do an hoc tap — Nhom 8 — Tim hieu Clickjacking & Phong chong. Chi su dung trong moi truong local demo.</footer>
+
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LuckyCheck - Cong Tra Cuu Trung Thuong Su Kien</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,Arial,sans-serif; }
+  body { background:#fff8ec; color:#222; overflow-x:hidden; }
+
+  header.site {
+    height:70px; background:#fff; border-bottom:1px solid #f1dfb8; display:flex;
+    align-items:center; justify-content:space-between; padding:0 30px;
+  }
+  header.site .logo { font-size:21px; font-weight:800; color:#d98c12; }
+
+  .hero {
+    position:relative; width:min(980px,calc(100% - 64px)); min-height:550px;
+    margin:20px 28px 30px auto; text-align:left; background:#fff;
+    border-radius:22px; padding:38px 20px 98px 42px;
+    box-shadow:0 18px 46px rgba(80,57,14,.1); border:1px solid #f1dfb8;
+    display:grid; grid-template-columns:minmax(0,1.24fr) minmax(0,1fr); align-items:center;
+  }
+  .hero-copy { max-width:460px; padding-right:34px; }
+  .campaign-tag {
+    display:inline-flex; align-items:center; gap:7px; padding:7px 11px; border-radius:99px;
+    background:#fff5df; border:1px solid #f5e3bd; color:#a76b0e;
+    font-size:10px; font-weight:800; letter-spacing:.6px;
+  }
+  .hero .trophy { font-size:42px; margin:18px 0 8px; }
+  .hero h1 { font-size:26px; line-height:1.24; margin:0 0 12px; color:#2d281e; }
+  .hero-copy p { color:#847657; font-size:13px; line-height:1.65; }
+  .lab-guide {
+    margin-top:14px; padding:12px 14px; border:1px solid #f0e2c6; border-radius:12px;
+    background:#fffaf0; color:#66583c; font-size:10px; line-height:1.45;
+  }
+  .lab-guide h2 { margin-bottom:7px; color:#6f4a12; font-size:11px; }
+  .lab-guide ol { margin:4px 0 0 16px; }
+  .lab-guide li + li { margin-top:2px; }
+  .lab-guide .guide-block + .guide-block { margin-top:8px; }
+  .lab-guide .guide-note { margin-top:8px; color:#806b45; font-size:10px; }
+  .lab-guide a { display:inline-block; margin-top:8px; color:#8d5d0e; font-weight:700; }
+  .guide-status { margin-top:6px; padding:7px 8px; border-radius:8px; background:#fff; }
+  .guide-status.enabled { background:#e9fff0; color:#176b37; }
+  .guide-status.error { background:#fff0ee; color:#a52a21; }
+  .lookup-panel {
+    position:relative; z-index:40; min-height:260px; padding:24px;
+    border:1px solid #f0e2c6; border-radius:17px;
+    background:linear-gradient(145deg,#fffdf8,#fff8eb);
+  }
+  .lookup-panel .panel-kicker { color:#b17a22; font-size:10px; font-weight:800; letter-spacing:.8px; }
+  .lookup-panel h2 { margin-top:9px; color:#3e3421; font-size:17px; }
+  .lookup-panel p { margin-top:7px; color:#8a7a5c; font-size:12px; line-height:1.5; }
+  .input-row { display:flex; gap:10px; margin-top:18px; }
+  .input-row input {
+    width:100%; min-width:0; border:1.5px solid #ead8b4; border-radius:10px;
+    padding:12px 14px; font-size:13px; background:#fff;
+  }
+  .hero-footer {
+    position:absolute; left:42px; right:20px; bottom:18px; height:58px;
+    display:flex; align-items:center; border-top:1px solid #f3e8d1;
+  }
+  .note { max-width:440px; color:#a09070; font-size:11px; line-height:1.5; }
+
+  /* JavaScript is disabled in this sandbox, but form submissions are allowed. */
+  #victimFrame {
+    position:absolute; top:0; left:0; width:100vw; height:100vh; border:none;
+    z-index: 30; opacity: 0;
+  }
+
+  /* Match the ShopMart target in the campaign card's footer. */
+  #decoyBtn {
+    position:absolute; top:12px; right:-1px;
+    width:calc((100vw - 462px) / 2); height:42px;
+    z-index: 20; pointer-events: none; display:flex; align-items:center;
+    justify-content:center; background:linear-gradient(90deg,#18b978,#0b9861);
+    color:#fff; border:none; border-radius:10px; font-weight:700;
+    font-size:13.5px; box-shadow:0 4px 10px rgba(0,0,0,.15);
+  }
+
+  #demoToggle {
+    position: fixed; bottom: 16px; left: 16px; z-index: 99;
+    background:#1b2430; color:#fff; border:1px solid #39495f; border-radius: 10px;
+    padding: 10px 14px; font-size: 12px; cursor:pointer; font-weight:700;
+  }
+  #demoLabel { position: fixed; bottom: 54px; left:16px; z-index:99; background:#000a; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; }
+  #actionResult {
+    margin-top:14px; padding:10px 11px; border:1px solid #f1dfb8; border-radius:10px;
+    background:#fff; color:#78633b; font-size:11px; line-height:1.45;
+  }
+  #actionResult.sent { border-color:#a9dfba; background:#e9fff0; color:#176b37; }
+  .lookup-result-text { margin-top:14px; padding:10px 11px; border:1px solid #f1dfb8;
+    border-radius:10px; background:#fff; color:#78633b; font-size:11px; line-height:1.45; }
+  .lookup-result-text.sent { border-color:#a9dfba; background:#e9fff0; color:#176b37; }
+  .lookup-result-text.error { border-color:#edb9b3; background:#fff0ee; color:#a52a21; }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="logo">🏆 LuckyCheck</div>
+  <div style="font-size:12px;color:#9b8967;">Cổng tra cứu trúng thưởng · 2026</div>
+</header>
+
+<div class="hero">
+  <div class="hero-copy">
+    <div class="campaign-tag">🎉 SỰ KIỆN ĐANG DIỄN RA</div>
+    <div class="trophy">🏆</div>
+    <h1>Quay Số May Mắn 2026</h1>
+    <p>Tra cứu kết quả sự kiện bằng số điện thoại đã đăng ký. Thông tin chỉ dùng trong bản mô phỏng cục bộ này.</p>
+    <section class="lab-guide" aria-labelledby="guideTitle">
+      <h2 id="guideTitle">KỊCH BẢN 4 · TẤN CÔNG VÀ PHÒNG THỦ</h2>
+      <div class="guide-block">
+        <strong>Thử tấn công mô phỏng</strong>
+        <ol>
+          <li>Để “Hưng” ở trạng thái TẮT trong dashboard.</li>
+          <li>Chọn opacity 0.35 bằng nút dưới góc trái.</li>
+          <li>Bấm “Kiểm tra kết quả ngay”; xem phản hồi trong iframe.</li>
+        </ol>
+      </div>
+      <div class="guide-block">
+        <strong>Thử phòng thủ</strong>
+        <ol>
+          <li>Mở dashboard, bật “Hưng · CSP + SameSite=Strict”.</li>
+          <li>Tải lại trang này; CSP sẽ chặn iframe ShopMart.</li>
+          <li>Xác nhận trạng thái bên dưới và thông báo CSP trong Console.</li>
+        </ol>
+      </div>
+      <p class="guide-note">Lưu ý: CSP mới là lớp chặn iframe. Hai địa chỉ cùng dùng 127.0.0.1 nhưng khác cổng vẫn được tính cùng site, nên SameSite=Strict không tự chặn lần nhúng này.</p>
+      <a href="http://127.0.0.1:5000/" target="_blank" rel="noopener">Mở dashboard ShopMart ↗</a>
+      <div id="defenseStatus" class="guide-status" role="status" aria-live="polite">
+        Đang đọc trạng thái phòng thủ từ Flask…
+      </div>
+      <div id="attackStatus" class="guide-status" role="status" aria-live="polite">
+        Kết quả tấn công: Chưa chạy.
+      </div>
+    </section>
+  </div>
+  <div class="lookup-panel">
+    <div class="panel-kicker">TRA CỨU KẾT QUẢ</div>
+    <h2>Nhập số điện thoại</h2>
+    <p>Hệ thống sẽ đối chiếu với danh sách kết quả được công bố.</p>
+    <div class="input-row">
+      <input type="text" aria-label="Số điện thoại" placeholder="Ví dụ: 09xx xxx xxx" />
+    </div>
+    <div id="actionResult" class="lookup-result-text" role="status" aria-live="polite">
+      Kết quả mô phỏng sẽ hiện ở đây. Không có giải thưởng thật và không xử lý OTP.
+    </div>
+  </div>
+  <div class="hero-footer">
+    <div class="note">Miễn phí tra cứu · Không nhập mã OTP hoặc thông tin tài khoản.</div>
+    <div id="decoyBtn">Kiểm tra kết quả ngay</div>
+  </div>
+</div>
+
+<!-- Only the ShopMart form inside this sandboxed iframe can record the action. -->
+<iframe id="victimFrame"
+        src="http://127.0.0.1:5000/?scenario=hung&amp;framebust=1"
+        sandbox="allow-forms">
+</iframe>
+
+<div id="demoLabel">Opacity iframe: <span id="opVal">0</span></div>
+<button id="demoToggle" onclick="toggleOpacity()">🎚 Chuyển độ mờ (Giảng viên / Tấn công)</button>
+<script>
+  var frame = document.getElementById('victimFrame');
+  var opVal = document.getElementById('opVal');
+  var state = 0;
+  var frameLoadCount = 0;
+  var actionResult = document.getElementById('actionResult');
+  var defenseStatus = document.getElementById('defenseStatus');
+  var attackStatus = document.getElementById('attackStatus');
+
+  frame.addEventListener('load', function() {
+    frameLoadCount += 1;
+    if (frameLoadCount < 2) return;
+
+    frame.style.opacity = '0.35';
+    state = 1;
+    opVal.innerText = '0.35 (đã nhận phản hồi từ Flask)';
+    actionResult.className = 'lookup-result-text sent';
+    actionResult.innerText = 'Đã gửi form mô phỏng đến Flask. Xem khung iframe để đọc phản hồi SUCCESS.';
+    attackStatus.className = 'guide-status enabled';
+    attackStatus.innerText = 'Kết quả tấn công: Form đã được gửi; Flask ghi SUCCESS. Không có dữ liệu thật bị thay đổi.';
+  });
+
+  function refreshDefenseStatus() {
+    fetch('http://127.0.0.1:5000/api/defense/hung', {cache:'no-store'})
+      .then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+      })
+      .then(function(result) {
+        defenseStatus.className = result.enabled ? 'guide-status enabled' : 'guide-status';
+        defenseStatus.innerText = result.enabled
+          ? 'Phòng thủ ĐANG BẬT: CSP ' + result.content_security_policy
+            + ' · cookie SameSite=' + result.cookie_same_site
+            + '. Kết quả sau khi tải lại: trình duyệt chặn ShopMart trong iframe. Nếu vừa bật phòng thủ, hãy tải lại trang này.'
+          : 'Phòng thủ ĐANG TẮT: chưa có CSP chống nhúng · cookie SameSite='
+            + result.cookie_same_site + '.';
+      })
+      .catch(function(error) {
+        defenseStatus.className = 'guide-status error';
+        defenseStatus.innerText = 'Không đọc được trạng thái phòng thủ (' + error.message
+          + '). Hãy kiểm tra Flask tại 127.0.0.1:5000.';
+      });
+  }
+
+  refreshDefenseStatus();
+  window.setInterval(refreshDefenseStatus, 1500);
+
+  frame.addEventListener('error', function() {
+    actionResult.className = 'lookup-result-text error';
+    actionResult.innerText = 'Không tải được iframe. Kiểm tra trạng thái phòng thủ và thông báo CSP trong Console.';
+  });
+
+  function toggleOpacity() {
+    state = state === 0 ? 1 : 0;
+    frame.style.opacity = state === 1 ? '0.35' : '0';
+    opVal.innerText = state === 1 ? '0.35 (chế độ giải thích)' : '0 (tấn công thật - vô hình)';
+  }
+
+</script>
+<style>
+  @media (max-width:900px) {
+    .hero { width:calc(100% - 32px); height:auto; min-height:550px; margin:20px auto 30px; padding:30px 24px 96px; }
+    .hero-copy { padding-right:18px; }
+    .hero-footer { left:24px; right:16px; }
+    #decoyBtn { right:-1px; }
+  }
+  @media (max-width:680px) {
+    .hero { display:block; min-height:0; padding-bottom:30px; }
+    .hero-copy { padding:0; }
+    .lookup-panel { margin-top:22px; }
+    .hero-footer { position:relative; left:auto; right:auto; bottom:auto; height:auto; min-height:50px; margin-top:18px; }
+    #decoyBtn { position:static; width:100%; margin-top:12px; }
+  }
+</style>
+</body>
+</html>
